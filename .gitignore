@@ -37,3 +37,13 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+# Input Files
+images-all/*.JPG
+images-all/*.jpg
+images/*.JPG
+images/*.jpg
+
+# Output files
+*.mp4
+*.MP4
