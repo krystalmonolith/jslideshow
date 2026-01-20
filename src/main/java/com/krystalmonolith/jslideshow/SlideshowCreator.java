@@ -18,29 +18,33 @@ import java.util.Comparator;
 
 /**
  * Creates a video slideshow from JPG images with dissolve transitions.
- * Pure Java implementation using JCodec - Java 24 compatible.
- * <p>
- * Maven dependencies:
- * <dependency>
- * <groupId>org.jcodec</groupId>
- * <artifactId>jcodec</artifactId>
- * <version>0.2.5</version>
- * </dependency>
- * <dependency>
- * <groupId>org.jcodec</groupId>
- * <artifactId>jcodec-javase</artifactId>
- * <version>0.2.5</version>
- * </dependency>
+ * Pure Java implementation using JCodec.
  */
 public class SlideshowCreator {
 
-    private static final double DURATION = 3.0;      // seconds per image
-    private static final double TRANSITION = 0.75;    // transition duration in seconds
-    private static final int FRAME_RATE = 30;        // frames per second
+    /**
+     * Default Constructor to placate JavaDoc
+     */
+    public SlideshowCreator() {
+    }
+
+    /**
+     * seconds per image
+     */
+    private static final double DURATION = 3.0;
+    /**
+     * transition duration in seconds
+     */
+    private static final double TRANSITION = 0.75;
+    /**
+     * frames per second
+     */
+    private static final int FRAME_RATE = 30;
 
     /**
      * Generate output filename with timestamp in format: YYYYMMDD'T'hhmmss-output.mp4
      * Example: 20240119T143052-output.mp4
+     * @return time stamped output file name string
      */
     private static String generateOutputFilename() {
         var formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss");
@@ -48,6 +52,10 @@ public class SlideshowCreator {
         return "%s-output.mp4".formatted(timestamp);
     }
 
+    /**
+     * Program Entry Point
+     * @param args Array of zero or more command line arguments.
+     */
     public static void main(String[] args) {
         try {
             if (args.length < 1) {
@@ -77,6 +85,11 @@ public class SlideshowCreator {
         }
     }
 
+    /**
+     * Make a slide show video!
+     * @param directoryPath Path of a directory containing one or more *.JPG or *.jpg files.
+     * @throws Exception on error creating the video
+     */
     public void createSlideshow(Path directoryPath) throws Exception {
         // Record start time
         var startTime = System.currentTimeMillis();
@@ -91,10 +104,9 @@ public class SlideshowCreator {
         // Generate timestamped output filename
         var outputFile = generateOutputFilename();
 
-        System.out.println("Processing directory: %s".formatted(directoryPath.toAbsolutePath()));
-        System.out.println("Found %d images".formatted(imageFiles.length));
-        System.out.println("Output file: %s".formatted(outputFile));
-        System.out.println();
+        System.out.printf("Processing directory: %s%n", directoryPath.toAbsolutePath());
+        System.out.printf("Found %d images%n", imageFiles.length);
+        System.out.printf("Output file: %s\n%n", outputFile);
 
         // Create encoder
         var encoder = SequenceEncoder.createSequenceEncoder(new File(outputFile), FRAME_RATE);
@@ -105,8 +117,8 @@ public class SlideshowCreator {
                 // Calculate percentage
                 int percentage = (int) ((i + 1) * 100.0 / imageFiles.length);
 
-                System.out.println("\r[%3d%%] Processing image %d/%d: %s".formatted(
-                        percentage, i + 1, imageFiles.length, imageFiles[i].getName()));
+                System.out.printf(
+                        "\r[%3d%%] Processing image %d/%d: %s%n", percentage, i + 1, imageFiles.length, imageFiles[i].getName());
 
                 if (currentImage == null) {
                     System.out.print('R');
@@ -132,8 +144,8 @@ public class SlideshowCreator {
             var elapsedSeconds = (endTime - startTime) / 1000.0;
 
             System.out.println();
-            System.out.println("Success! Created %s".formatted(outputFile));
-            System.out.println("Total processing time: %.2f seconds".formatted(elapsedSeconds));
+            System.out.printf("Success! Created %s%n", outputFile);
+            System.out.printf("Total processing time: %.2f seconds%n", elapsedSeconds);
 
         } finally {
             // Finish encoding and close the file
@@ -141,18 +153,29 @@ public class SlideshowCreator {
         }
     }
 
-    private void processImage(SequenceEncoder encoder, BufferedImage currentImage) throws IOException {
+    /**
+     * Encode all the frames to show a given image.
+     * @param encoder a {@link SequenceEncoder} instance
+     * @param image the image to encode
+     * @throws IOException on error encoding frame(s) from the image
+     */
+    private void processImage(SequenceEncoder encoder, BufferedImage image) throws IOException {
         // Show current image for (DURATION - TRANSITION) seconds
         int holdFrames = (int) ((DURATION - TRANSITION) * FRAME_RATE);
         for (int f = 0; f < holdFrames; f++) {
             System.out.print('.');
-            encodeFrame(encoder, currentImage);
+            encodeFrame(encoder, image);
         }
     }
 
+    /**
+     * Locates all the image file(s) to be used as input.
+     * @param directoryPath Path of a directory containing one or more *.JPG or *.jpg files.
+     * @return an array of zero or more {@link File}
+     */
     private File[] findImageFiles(Path directoryPath) {
         var dir = directoryPath.toFile();
-        var files = dir.listFiles((d, name) ->
+        var files = dir.listFiles((_, name) ->
                 name.endsWith(".JPG") || name.endsWith(".jpg"));
 
         if (files == null) {
@@ -163,6 +186,13 @@ public class SlideshowCreator {
         return files;
     }
 
+    /**
+     * Generate a dissolve transition from the {@code currentImage} to the {@code nextImage}.
+     * @param encoder a {@link SequenceEncoder} instance
+     * @param currentImage The image that is shown at the beginning of the dissolve.
+     * @param nextImage The image that is shown at the end of the dissolve.
+     * @throws IOException on error encoding frame(s) for the dissolve
+     */
     private void processDissolve(SequenceEncoder encoder,
                                  BufferedImage currentImage,
                                  BufferedImage nextImage) throws IOException {
@@ -171,14 +201,19 @@ public class SlideshowCreator {
 
         for (int f = 0; f < transitionFrames; f++) {
             float alpha = (float) f / transitionFrames;  // 0.0 to 1.0
+            System.out.print('+');
             var blended = blendImages(currentImage, nextImage, alpha);
-            System.out.print(';');
+            System.out.print('.');
             encodeFrame(encoder, blended);
         }
     }
 
     /**
      * Encode a BufferedImage as a video frame.
+     *
+     * @param encoder a SequenceEncoder instance
+     * @param image   image buffer to send to the encoder
+     * @throws IOException on error writing output video file
      */
     private void encodeFrame(SequenceEncoder encoder, BufferedImage image) throws IOException {
         // Convert BufferedImage to JCodec Picture
