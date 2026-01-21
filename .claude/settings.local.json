@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(git -C \"C:\\\\Users\\\\mdeaz\\\\Documents\\\\dev\\\\jslideshow\\\\jslideshow\" status)",
+      "Bash(git -C \"C:\\\\Users\\\\mdeaz\\\\Documents\\\\dev\\\\jslideshow\\\\jslideshow\" diff)",
+      "Bash(git -C \"C:\\\\Users\\\\mdeaz\\\\Documents\\\\dev\\\\jslideshow\\\\jslideshow\" log --oneline -5)",
+      "Bash(git -C \"C:\\\\Users\\\\mdeaz\\\\Documents\\\\dev\\\\jslideshow\\\\jslideshow\" add CLAUDE.md)",
+      "Bash(git -C \"C:\\\\Users\\\\mdeaz\\\\Documents\\\\dev\\\\jslideshow\\\\jslideshow\" commit -m \"$\\(cat <<''EOF''\nAdd CLAUDE.md for Claude Code guidance\n\nProvides build commands, architecture overview, and configuration\ndetails to help future Claude Code instances work with this codebase.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C \"C:\\\\Users\\\\mdeaz\\\\Documents\\\\dev\\\\jslideshow\\\\jslideshow\" push)"
+    ]
+  }
+}
