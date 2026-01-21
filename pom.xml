@@ -7,7 +7,7 @@
 
     <groupId>com.krystalmonolith</groupId>
     <artifactId>jslideshow</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.2</version>
     <packaging>jar</packaging>
 
     <name>JSlideshow</name>
@@ -83,6 +83,14 @@
             <artifactId>maven-pmd-plugin</artifactId>
             <version>3.28.0</version>
             <scope>compile</scope>
+        </dependency>
+
+        <!-- JUnit 6 for testing -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>6.1.0-M1</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

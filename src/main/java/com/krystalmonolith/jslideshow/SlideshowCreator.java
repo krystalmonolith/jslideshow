@@ -22,24 +22,52 @@ import java.util.Comparator;
  */
 public class SlideshowCreator {
 
-    /**
-     * Default Constructor to placate JavaDoc
-     */
-    public SlideshowCreator() {
-    }
+    /** Default seconds per image */
+    public static final double DEFAULT_DURATION = 3.0;
+    /** Default transition duration in seconds */
+    public static final double DEFAULT_TRANSITION = 0.75;
+    /** Default frames per second */
+    public static final int DEFAULT_FRAME_RATE = 30;
 
     /**
      * seconds per image
      */
-    private static final double DURATION = 3.0;
+    private final double duration;
     /**
      * transition duration in seconds
      */
-    private static final double TRANSITION = 0.75;
+    private final double transition;
     /**
      * frames per second
      */
-    private static final int FRAME_RATE = 30;
+    private final int frameRate;
+
+    /**
+     * Default Constructor using default values.
+     */
+    public SlideshowCreator() {
+        this(DEFAULT_DURATION, DEFAULT_TRANSITION, DEFAULT_FRAME_RATE);
+    }
+
+    /**
+     * Constructor with configurable parameters.
+     * @param duration seconds per image
+     * @param transition transition duration in seconds
+     * @param frameRate frames per second
+     * @throws IllegalArgumentException if parameters are invalid
+     */
+    public SlideshowCreator(double duration, double transition, int frameRate) {
+        if (duration < 0) throw new IllegalArgumentException("duration must be >= 0");
+        if (transition < 0) throw new IllegalArgumentException("transition must be >= 0");
+        if (duration == 0 && transition == 0) throw new IllegalArgumentException("duration and transition cannot both be zero");
+        if (frameRate <= 0) throw new IllegalArgumentException("frameRate must be positive");
+        if (duration < transition) {
+            System.out.println("Note: transition is longer than duration; images will only appear during transitions");
+        }
+        this.duration = duration;
+        this.transition = transition;
+        this.frameRate = frameRate;
+    }
 
     /**
      * Generate output filename with timestamp in format: YYYYMMDD'T'hhmmss-output.mp4
@@ -76,49 +104,42 @@ public class SlideshowCreator {
         System.out.printf("Output file: %s\n%n", outputFile);
 
         // Create encoder
-        var encoder = SequenceEncoder.createSequenceEncoder(new File(outputFile), FRAME_RATE);
+        var encoder = SequenceEncoder.createSequenceEncoder(new File(outputFile), frameRate);
 
         try {
             BufferedImage currentImage = null;
-            BufferedImage lastImage = null;
 
             for (int i = 0; i < imageFiles.length; i++) {
                 // Calculate percentage
                 int percentage = (int) ((i + 1) * 100.0 / imageFiles.length);
 
                 System.out.printf(
-                        "\r[%3d%%] Processing image %d/%d: %s%n", percentage, i + 1, imageFiles.length, imageFiles[i].getName());
+                        "\r[%3d%%] Processing image %d/%d: %s \n", percentage, i + 1, imageFiles.length, imageFiles[i].getName());
 
                 if (currentImage == null) {
                     System.out.print('R');
                     currentImage = ImageIO.read(imageFiles[i]);
+                    var blackImage = createBlackImage(currentImage.getWidth(), currentImage.getHeight());
 
                     // Fade in from black for the first image
-                    System.out.print(" [fade-in]");
-                    var blackImage = createBlackImage(currentImage.getWidth(), currentImage.getHeight());
+                    System.out.print("F");
                     processDissolve(encoder, blackImage, currentImage);
                 }
 
-                if (i < imageFiles.length - 1) {
-                    processImage(encoder, currentImage);
+                processImage(encoder, currentImage);
 
+                if (i < imageFiles.length - 1) { // If not last image
                     System.out.print('r');
                     var nextImage = ImageIO.read(imageFiles[i + 1]);
 
                     // Dissolve transition
                     processDissolve(encoder, currentImage, nextImage);
                     currentImage = nextImage;
-                } else {
-                    processImage(encoder, currentImage);
-                    lastImage = currentImage;
+                } else { // Last image
+                    var blackImage = createBlackImage(currentImage.getWidth(), currentImage.getHeight());
+                    System.out.print("f");
+                    processDissolve(encoder, currentImage, blackImage);
                 }
-            }
-
-            // Fade out to black after the last image
-            if (lastImage != null) {
-                System.out.print(" [fade-out]");
-                var blackImage = createBlackImage(lastImage.getWidth(), lastImage.getHeight());
-                processDissolve(encoder, lastImage, blackImage);
             }
 
             // Calculate elapsed time
@@ -142,8 +163,8 @@ public class SlideshowCreator {
      * @throws IOException on error encoding frame(s) from the image
      */
     private void processImage(SequenceEncoder encoder, BufferedImage image) throws IOException {
-        // Show current image for (DURATION - TRANSITION) seconds
-        int holdFrames = (int) ((DURATION - TRANSITION) * FRAME_RATE);
+        // Show current image for (duration - transition) seconds
+        int holdFrames = (int) ((duration - transition) * frameRate);
         for (int f = 0; f < holdFrames; f++) {
             System.out.print('.');
             encodeFrame(encoder, image);
@@ -179,7 +200,7 @@ public class SlideshowCreator {
                                  BufferedImage currentImage,
                                  BufferedImage nextImage) throws IOException {
 
-        int transitionFrames = (int) (TRANSITION * FRAME_RATE);
+        int transitionFrames = (int) (transition * frameRate);
 
         for (int f = 0; f < transitionFrames; f++) {
             float alpha = (float) (f+1) / transitionFrames;  // 0.0 > alpha <=tes 1.0

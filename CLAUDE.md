@@ -14,7 +14,7 @@ JSlideshow is a pure Java command-line application that creates MP4 video slides
 JAVA_HOME="C:/Users/mdeaz/.jdks/openjdk-24" "C:/Program Files/JetBrains/IntelliJ IDEA 2025.1/plugins/maven/lib/maven3/bin/mvn.cmd" clean package
 
 # Run the application
-"C:/Users/mdeaz/.jdks/openjdk-24/bin/java.exe" -jar target/jslideshow-1.2.0-jar-with-dependencies.jar /path/to/images
+"C:/Users/mdeaz/.jdks/openjdk-24/bin/java.exe" -jar target/jslideshow-1.2.1-jar-with-dependencies.jar <directory> [duration] [transition] [frameRate]
 ```
 
 ## Architecture
@@ -30,12 +30,14 @@ JAVA_HOME="C:/Users/mdeaz/.jdks/openjdk-24" "C:/Program Files/JetBrains/IntelliJ
   - `blendImages()` - uses `AlphaComposite` to blend two images
   - `encodeFrame()` - converts `BufferedImage` to JCodec `Picture` and encodes
 
-**Configuration constants** at top of `SlideshowCreator.java`:
+**Default configuration constants** at top of `SlideshowCreator.java`:
 ```java
-private static final double DURATION = 3.0;      // seconds per image
-private static final double TRANSITION = 0.75;   // transition duration
-private static final int FRAME_RATE = 30;        // frames per second
+public static final double DEFAULT_DURATION = 3.0;      // seconds per image
+public static final double DEFAULT_TRANSITION = 0.75;   // transition duration
+public static final int DEFAULT_FRAME_RATE = 30;        // frames per second
 ```
+
+These can be overridden via optional command line arguments: `[duration] [transition] [frameRate]`
 
 ## Dependencies
 
@@ -52,3 +54,17 @@ private static final int FRAME_RATE = 30;        // frames per second
 - Container: MP4
 - Codec: H.264
 - Filename pattern: `YYYYMMDD'T'HHmmss-output.mp4`
+
+## Fast Test
+
+```bash
+"C:/Users/mdeaz/.jdks/openjdk-24/bin/java.exe" -jar target/jslideshow-1.2.1-jar-with-dependencies.jar images 5.0 2.5 30
+```
+
+## Bump Version
+
+When asked to "bump the version" or "bump":
+1. Read the current `<version>` tag from pom.xml
+2. Increment the patch number (e.g., 1.2.1 → 1.2.2)
+3. Update the `<version>` tag in pom.xml
+4. Report the change (e.g., "Version bumped: 1.2.1 → 1.2.2")

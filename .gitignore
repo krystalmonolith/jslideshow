@@ -43,7 +43,10 @@ images-all/*.JPG
 images-all/*.jpg
 images/*.JPG
 images/*.jpg
+/images/images1080
+/images/images-original
 
 # Output files
 *.mp4
 *.MP4
+
