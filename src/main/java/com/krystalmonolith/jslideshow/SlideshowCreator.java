@@ -80,6 +80,8 @@ public class SlideshowCreator {
 
         try {
             BufferedImage currentImage = null;
+            BufferedImage lastImage = null;
+
             for (int i = 0; i < imageFiles.length; i++) {
                 // Calculate percentage
                 int percentage = (int) ((i + 1) * 100.0 / imageFiles.length);
@@ -90,6 +92,11 @@ public class SlideshowCreator {
                 if (currentImage == null) {
                     System.out.print('R');
                     currentImage = ImageIO.read(imageFiles[i]);
+
+                    // Fade in from black for the first image
+                    System.out.print(" [fade-in]");
+                    var blackImage = createBlackImage(currentImage.getWidth(), currentImage.getHeight());
+                    processDissolve(encoder, blackImage, currentImage);
                 }
 
                 if (i < imageFiles.length - 1) {
@@ -103,7 +110,15 @@ public class SlideshowCreator {
                     currentImage = nextImage;
                 } else {
                     processImage(encoder, currentImage);
+                    lastImage = currentImage;
                 }
+            }
+
+            // Fade out to black after the last image
+            if (lastImage != null) {
+                System.out.print(" [fade-out]");
+                var blackImage = createBlackImage(lastImage.getWidth(), lastImage.getHeight());
+                processDissolve(encoder, lastImage, blackImage);
             }
 
             // Calculate elapsed time
@@ -167,7 +182,7 @@ public class SlideshowCreator {
         int transitionFrames = (int) (TRANSITION * FRAME_RATE);
 
         for (int f = 0; f < transitionFrames; f++) {
-            float alpha = (float) f / transitionFrames;  // 0.0 to 1.0
+            float alpha = (float) (f+1) / transitionFrames;  // 0.0 > alpha <=tes 1.0
             System.out.print('+');
             var blended = blendImages(currentImage, nextImage, alpha);
             System.out.print('.');
@@ -186,6 +201,18 @@ public class SlideshowCreator {
         // Convert BufferedImage to JCodec Picture
         Picture picture = AWTUtil.fromBufferedImage(image, ColorSpace.RGB);
         encoder.encodeNativeFrame(picture);
+    }
+
+    /**
+     * Create a black image with the specified dimensions.
+     * TYPE_INT_RGB initializes all pixels to black (0,0,0) by default.
+     *
+     * @param width  Width of the image in pixels
+     * @param height Height of the image in pixels
+     * @return A new BufferedImage filled with black
+     */
+    private BufferedImage createBlackImage(int width, int height) {
+        return new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
     }
 
     /**

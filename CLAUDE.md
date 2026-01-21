@@ -10,16 +10,11 @@ JSlideshow is a pure Java command-line application that creates MP4 video slides
 
 ```bash
 # Build the project (creates fat JAR with dependencies)
-mvn clean package
+# Uses IntelliJ's bundled Maven with Java 24 from .jdks
+JAVA_HOME="C:/Users/mdeaz/.jdks/openjdk-24" "C:/Program Files/JetBrains/IntelliJ IDEA 2025.1/plugins/maven/lib/maven3/bin/mvn.cmd" clean package
 
 # Run the application
-java -jar target/jslideshow-1.2.0-jar-with-dependencies.jar /path/to/images
-
-# Run directly without packaging
-mvn exec:java -Dexec.mainClass="com.krystalmonolith.jslideshow.Main" -Dexec.args="/path/to/images"
-
-# Generate project documentation site
-mvn site
+"C:/Users/mdeaz/.jdks/openjdk-24/bin/java.exe" -jar target/jslideshow-1.2.0-jar-with-dependencies.jar /path/to/images
 ```
 
 ## Architecture
