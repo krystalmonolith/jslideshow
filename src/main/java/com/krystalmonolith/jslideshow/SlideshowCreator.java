@@ -53,39 +53,6 @@ public class SlideshowCreator {
     }
 
     /**
-     * Program Entry Point
-     * @param args Array of zero or more command line arguments.
-     */
-    public static void main(String[] args) {
-        try {
-            if (args.length < 1) {
-                System.err.println("Usage: java com.krystalmonolith.jslideshow.SlideshowCreator <directory-path>");
-                System.err.println("Example: java com.krystalmonolith.jslideshow.SlideshowCreator /path/to/images");
-                System.exit(1);
-            }
-
-            var directoryPath = Path.of(args[0]);
-
-            if (!directoryPath.toFile().exists()) {
-                System.err.println("Error: Directory does not exist: " + args[0]);
-                System.exit(1);
-            }
-
-            if (!directoryPath.toFile().isDirectory()) {
-                System.err.println("Error: Path is not a directory: " + args[0]);
-                System.exit(1);
-            }
-
-            var creator = new SlideshowCreator();
-            creator.createSlideshow(directoryPath);
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
-            System.exit(1);
-        }
-    }
-
-    /**
      * Make a slide show video!
      * @param directoryPath Path of a directory containing one or more *.JPG or *.jpg files.
      * @throws Exception on error creating the video

@@ -13,10 +13,10 @@ JSlideshow is a pure Java command-line application that creates MP4 video slides
 mvn clean package
 
 # Run the application
-java -jar target/jslideshow-1.1.1-jar-with-dependencies.jar /path/to/images
+java -jar target/jslideshow-1.2.0-jar-with-dependencies.jar /path/to/images
 
 # Run directly without packaging
-mvn exec:java -Dexec.mainClass="com.krystalmonolith.jslideshow.SlideshowCreator" -Dexec.args="/path/to/images"
+mvn exec:java -Dexec.mainClass="com.krystalmonolith.jslideshow.Main" -Dexec.args="/path/to/images"
 
 # Generate project documentation site
 mvn site
@@ -24,11 +24,11 @@ mvn site
 
 ## Architecture
 
-**Single-class design** - The entire application is in `SlideshowCreator.java`:
+**Two-class design:**
 
-- **Entry point:** `main()` validates CLI args and creates instance
-- **Core API:** `createSlideshow(Path)` - processes directory of images
-- **Image processing pipeline:**
+- **`Main.java`** - CLI entry point, validates args, creates SlideshowCreator instance
+- **`SlideshowCreator.java`** - Core slideshow creation logic:
+  - `createSlideshow(Path)` - main processing method
   - `findImageFiles()` - discovers .JPG/.jpg files, sorts alphabetically
   - `processImage()` - encodes hold frames for (DURATION - TRANSITION) seconds
   - `processDissolve()` - creates alpha-blended transition frames between images

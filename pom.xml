@@ -7,7 +7,7 @@
 
     <groupId>com.krystalmonolith</groupId>
     <artifactId>jslideshow</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
     <packaging>jar</packaging>
 
     <name>JSlideshow</name>
@@ -108,7 +108,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.krystalmonolith.jslideshow.SlideshowCreator</mainClass>
+                            <mainClass>com.krystalmonolith.jslideshow.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -122,7 +122,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.krystalmonolith.jslideshow.SlideshowCreator</mainClass>
+                            <mainClass>com.krystalmonolith.jslideshow.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
