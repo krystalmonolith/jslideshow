@@ -1,18 +1,37 @@
 # JSlideshow - Pure Java Slideshow Creator
 
-Creates video slideshows from JPG images with smooth dissolve transitions using JCodec.
+Creates video slideshows from JPG images using JCodec with parallel H.264 encoding.
 
 ## Features
 
 - **Pure Java** - No native dependencies required
-- **Dissolve transitions** - Smooth alpha-blended transitions between images
+- **Parallel encoding** - Images encoded as independent GOPs across all CPU cores
 - **Java 24 compatible** - Uses modern Java features
-- **Customizable** - Configure duration, transition time, and frame rate
+- **Customizable** - Configure duration, transition time, and frame rate via CLI
 - **Platform independent** - Runs on any OS with Java 24+
-- **Command line interface** - Specify image directory as parameter
-- **Timestamped output** - Each run creates uniquely named output file (YYYYMMDD'T'hhmmss-output.mp4)
+- **Command line interface** - Specify image directory and encoding parameters
+- **Timestamped output** - Each run creates uniquely named output file (YYYYMMDD'T'HHmmss-output.mp4)
 - **Flexible input** - Processes all .JPG and .jpg files in specified directory
-- **Progress tracking** - Shows percentage completion and elapsed time
+
+## How Parallel Encoding Works
+
+JSlideshow uses a two-phase **segment-based parallel encoding** strategy:
+
+```
+Phase 1: Parallel Encoding (one encoder per image)
+  [Image 1] --> [Encoder 1] --> [Segment 1: IDR + P-frames]
+  [Image 2] --> [Encoder 2] --> [Segment 2: IDR + P-frames]
+  [Image 3] --> [Encoder 3] --> [Segment 3: IDR + P-frames]
+       ^
+    PARALLEL via IntStream.parallel()
+
+Phase 2: Sequential Muxing
+  [Segment 1] --> [Segment 2] --> [Segment 3] --> MP4 file
+```
+
+Each image is encoded as an independent **GOP (Group of Pictures)**, starting with an IDR keyframe followed by P-frames. Since GOPs have no cross-image dependencies, encoding is fully parallelizable. Encoded segments are then muxed into the MP4 container in order.
+
+The `CodecMP4MuxerTrack` handles Annex B to MP4 (ISO BMF) NAL unit conversion and SPS/PPS extraction internally during the muxing phase.
 
 ## Requirements
 
@@ -31,79 +50,90 @@ cd jslideshow
 # Build the project
 mvn clean package
 
-# Run with path to directory containing JPG files
-java -jar target/jslideshow-1.0.0-jar-with-dependencies.jar /path/to/images
+# Run with default settings (3s per image, 30 fps)
+java -jar target/jslideshow-1.3.1-jar-with-dependencies.jar /path/to/images
 
-# Example with current directory
-java -jar target/jslideshow-1.0.0-jar-with-dependencies.jar .
-
-# Example with absolute path
-java -jar target/jslideshow-1.0.0-jar-with-dependencies.jar /home/user/photos/vacation
+# Run with custom settings
+java -jar target/jslideshow-1.3.1-jar-with-dependencies.jar /path/to/images 5.0 0 30
 ```
 
 ### Usage
 
 ```
-java -jar target/jslideshow-1.0.0-jar-with-dependencies.jar <directory-path>
+java -jar target/jslideshow-1.3.1-jar-with-dependencies.jar <directory> [duration] [transition] [frameRate]
 ```
 
 **Parameters:**
-- `<directory-path>` - Path to directory containing JPG/jpg files (required)
+- `<directory>` - Path to directory containing JPG/jpg files (required)
+- `[duration]` - Seconds per image (default: 3.0)
+- `[transition]` - Dissolve transition duration in seconds (default: 0.0, not yet supported in parallel encoder)
+- `[frameRate]` - Frames per second (default: 30)
 
-**Example:**
-```bash
-java -jar target/jslideshow-1.0.0-jar-with-dependencies.jar ~/Pictures/vacation-2024
-```
+## Architecture
 
-### Directory Structure
+**Three-class design:**
 
-```
-jslideshow/
-├── src/
-│   └── main/
-│       └── java/
-│           └── com/
-│               └── krystalmonolith/
-│                   └── jslideshow/
-│                       └── SlideshowCreator.java
-├── pom.xml
-└── README.md
-```
+- **`Main.java`** - CLI entry point, validates args, parses optional parameters
+- **`SlideshowCreator2.java`** - Loads images, calculates frame counts, orchestrates encoding
+- **`JCodecParallelEncoder.java`** - Segment-based parallel H.264 encoding and MP4 muxing
+  - `encodeSegment()` - Encodes one image as an independent GOP (IDR + P-frames)
+  - `muxSegments()` - Writes segments sequentially to MP4 with global frame numbering
 
-Place your `DSC_*.JPG` files in the directory where you run the JAR.
+### Memory Optimization
+
+Encoded frame data is compacted into right-sized buffers immediately after encoding. The H.264 encoder requires a worst-case ~5MB buffer per frame, but actual encoded data is typically ~150KB. Without compaction, encoding 144 images at 150 frames each would require ~105GB; with compaction, it requires ~3.3GB.
 
 ## Configuration
 
-Edit the constants in `SlideshowCreator.java`:
+Default values can be overridden via command line arguments:
 
 ```java
-private static final double DURATION = 1.0;      // seconds per image
-private static final double TRANSITION = 0.5;    // transition duration in seconds
-private static final int FRAME_RATE = 30;        // frames per second
+public static final double DEFAULT_DURATION = 3.0;      // seconds per image
+public static final double DEFAULT_TRANSITION = 0.0;     // transition duration (disabled)
+public static final int DEFAULT_FRAME_RATE = 30;         // frames per second
 ```
 
-The output filename is automatically generated with a timestamp in the format: `YYYYMMDD'T'hhmmss-output.mp4`
+The output filename is automatically generated with a timestamp: `YYYYMMDD'T'HHmmss-output.mp4`
 
-## How It Works
+## Example Output
 
-The slideshow creator processes images sequentially:
+```
+Parameters:
+  Duration:   5.00 seconds
+  Transition: 0.00 seconds
+  Frame rate: 30 fps
 
-1. **Hold Phase**: Each image is displayed for `(DURATION - TRANSITION)` seconds
-2. **Dissolve Phase**: Images blend together over `TRANSITION` seconds using alpha compositing
-   - Formula: `output = alpha × nextImage + (1-alpha) × currentImage`
-   - Alpha increases linearly from 0.0 to 1.0
-3. **Final Image**: Last image displays for full `DURATION`
+Processing directory: /home/user/photos/vacation
+Found 5 images
+Duration: 5.00 seconds per image (150 frames @ 30 fps)
+Output file: 20260128T124627-output.mp4
 
-### Performance
+  Loaded: DSC_7141_1920x1080.JPG (1620x1080)
+  Loaded: DSC_7145_1920x1080.JPG (1620x1080)
+  Loaded: DSC_7151_1920x1080.JPG (1620x1080)
+  Loaded: DSC_7155_1920x1080.JPG (1620x1080)
+  Loaded: DSC_7161_1920x1080.JPG (1620x1080)
+Encoding 5 images, 150 frames each @ 30 fps
+  Encoded segment 1/5
+  Encoded segment 5/5
+  Encoded segment 4/5
+  Encoded segment 2/5
+  Encoded segment 3/5
+Muxing segments...
+Wrote 750 total frames
 
-**For 144 images at 5568×3712 pixels:**
-- Processing time: 3-8 minutes (CPU-dependent)
-- Memory usage: 1-2GB peak
-- Output size: ~50-100MB (H.264 in MP4 container)
-- Total frames: ~4,320 frames
-- Duration: ~144 seconds (2 minutes 24 seconds)
+Success! Created 20260128T124627-output.mp4
+Total processing time: 10.13 seconds
+```
 
-The program displays progress percentage for each image processed and shows the total elapsed time at completion.
+Note: Segments complete out-of-order (1, 5, 4, 2, 3), confirming true parallel execution.
+
+## Performance
+
+**For 5 images at 1620x1080 pixels, 5s duration @ 30fps:**
+- Processing time: ~10 seconds
+- Output size: ~30MB (H.264 in MP4 container)
+- Total frames: 750
 
 ## Building from Source
 
@@ -111,140 +141,40 @@ The program displays progress percentage for each image processed and shows the 
 # Compile only
 mvn compile
 
-# Compile and package
+# Compile and package (fat JAR with dependencies)
 mvn clean package
 
-# Run without building JAR
-mvn exec:java -Dexec.mainClass="com.krystalmonolith.jslideshow.SlideshowCreator" -Dexec.args="/path/to/images"
-```
-
-## Running the Application
-
-### Option 1: Fat JAR (Recommended)
-```bash
-java -jar target/jslideshow-1.0.0-jar-with-dependencies.jar /path/to/images
-```
-
-### Option 2: With classpath
-```bash
-java -cp target/jslideshow-1.0.0.jar:target/dependency/* \
-  com.krystalmonolith.jslideshow.SlideshowCreator /path/to/images
-```
-
-### Option 3: Direct compilation
-```bash
-# Ensure JCodec jars are in lib/
-javac -cp "lib/*" -d target/classes \
-  src/main/java/com/krystalmonolith/jslideshow/SlideshowCreator.java
-
-java -cp "target/classes:lib/*" \
-  com.krystalmonolith.jslideshow.SlideshowCreator /path/to/images
-```
-
-## Example Output
-
-```
-Processing directory: /home/user/photos/vacation
-Found 144 images
-Output file: 20260119T143052-output.mp4
-
-[  1%] Processing image 1/144: DSC_7141.JPG
-[  1%] Processing image 2/144: DSC_7145.JPG
-[  2%] Processing image 3/144: DSC_7151.JPG
-[  3%] Processing image 4/144: DSC_7155.JPG
-...
-[ 99%] Processing image 143/144: DSC_7709.JPG
-[100%] Processing image 144/144: DSC_7713.JPG
-
-Success! Created 20260119T143052-output.mp4
-Total processing time: 287.45 seconds
+# Skip tests
+mvn clean package -DskipTests
 ```
 
 ## Troubleshooting
 
-### Usage Error / Missing Directory Parameter
-If you see: `Usage: java com.krystalmonolith.jslideshow.SlideshowCreator <directory-path>`
-- You must provide a directory path as the first argument
-- Example: `java -jar jslideshow-1.0.0-jar-with-dependencies.jar /path/to/images`
-
-### Directory Does Not Exist Error
-- Verify the path you provided exists
-- Use absolute paths or correct relative paths
-- Check spelling and case sensitivity
-
 ### Out of Memory Error
-Increase heap size:
+Increase heap size for large image sets:
 ```bash
-java -Xmx4g -jar target/jslideshow-1.0.0-jar-with-dependencies.jar /path/to/images
+java -Xmx8g -jar target/jslideshow-1.3.1-jar-with-dependencies.jar /path/to/images
 ```
 
 ### No Images Found
-- Ensure directory contains files with .JPG or .jpg extensions (both cases supported)
+- Ensure directory contains files with .JPG or .jpg extensions
 - Check file permissions
 - Verify you specified the correct directory path
 
-### Compilation Errors
-- Verify Java 24 is installed: `java -version`
-- Ensure Maven 3.9+ is installed: `mvn -version`
-- Clean and rebuild: `mvn clean install`
-
 ### Unsupported class file major version
-You're not using Java 24. Download and install Java 24 or modify `pom.xml` to use an earlier version (minimum Java 17 for text blocks and records).
+You're not using Java 24. Download and install Java 24 or later.
 
 ## Technical Details
 
 ### Dependencies
-- **JCodec 0.2.5** - Pure Java video encoding library
-- **JCodec JavaSE 0.2.5** - AWT integration for JCodec
-
-### Algorithm
-Uses alpha compositing via Java's `AlphaComposite` class to blend consecutive images. Each blended frame is converted to a JCodec `Picture` object and encoded to H.264.
+- **JCodec 0.2.5** - Pure Java H.264/MP4 video encoding
+- **JCodec JavaSE 0.2.5** - AWT integration for BufferedImage conversion
 
 ### Output Format
 - Container: MP4
 - Video codec: H.264
-- Color space: RGB
+- Color space: YUV420
 - Frame rate: 30 fps (configurable)
-
-## Customization Examples
-
-### Change output filename pattern
-Modify the `generateOutputFilename()` method:
-```java
-private static String generateOutputFilename() {
-    var formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
-    var timestamp = LocalDateTime.now().format(formatter);
-    return "slideshow-%s.mp4".formatted(timestamp);
-}
-```
-
-### Longer display time per image
-```java
-private static final double DURATION = 3.0;      // 3 seconds per image
-private static final double TRANSITION = 1.0;    // 1 second transition
-```
-
-### Higher quality (60 fps)
-```java
-private static final int FRAME_RATE = 60;
-```
-
-### Filter for specific file patterns
-Modify the `findImageFiles()` method to filter by prefix or other criteria:
-```java
-private File[] findImageFiles(Path directoryPath) {
-    var dir = directoryPath.toFile();
-    var files = dir.listFiles((d, name) -> 
-        name.startsWith("IMG_") && (name.endsWith(".JPG") || name.endsWith(".jpg")));
-    
-    if (files == null) {
-        return new File[0];
-    }
-    
-    Arrays.sort(files, Comparator.comparing(File::getName));
-    return files;
-}
-```
 
 ## License
 
