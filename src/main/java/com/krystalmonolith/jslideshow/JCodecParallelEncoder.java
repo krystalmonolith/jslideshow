@@ -103,7 +103,13 @@ public class JCodecParallelEncoder {
             VideoEncoder.EncodedFrame encoded = encoder.encodeFrame(yuv, buffer);
             boolean isKeyFrame = encoded.isKeyFrame();
 
-            ByteBuffer data = encoded.getData();
+            // Copy encoded data into a right-sized buffer so the oversized
+            // encoder buffer (~5MB) can be GC'd, keeping only the actual
+            // encoded data (~150KB typical)
+            ByteBuffer srcData = encoded.getData();
+            ByteBuffer data = ByteBuffer.allocate(srcData.remaining());
+            data.put(srcData);
+            data.flip();
 
             // Create packet with local frame number (remapped to global during muxing)
             MP4Packet packet = new MP4Packet(
