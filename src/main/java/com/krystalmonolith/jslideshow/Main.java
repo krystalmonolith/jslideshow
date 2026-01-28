@@ -47,7 +47,7 @@ public class Main {
             System.out.printf("  Transition: %.2f seconds%n", transition);
             System.out.printf("  Frame rate: %d fps%n%n", frameRate);
 
-            var creator = new SlideshowCreator(duration, transition, frameRate);
+            var creator = new SlideshowCreator2(duration, transition, frameRate);
             creator.createSlideshow(directoryPath);
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
