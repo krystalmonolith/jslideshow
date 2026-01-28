@@ -1,7 +1,6 @@
 package com.krystalmonolith.jslideshow;
 
 import org.jcodec.codecs.h264.H264Encoder;
-import org.jcodec.codecs.h264.H264Utils;
 import org.jcodec.common.Codec;
 import org.jcodec.common.VideoCodecMeta;
 import org.jcodec.common.VideoEncoder;
@@ -10,7 +9,6 @@ import org.jcodec.common.io.SeekableByteChannel;
 import org.jcodec.common.model.*;
 import org.jcodec.containers.mp4.Brand;
 import org.jcodec.containers.mp4.MP4Packet;
-import org.jcodec.containers.mp4.boxes.SampleEntry;
 import org.jcodec.containers.mp4.muxer.CodecMP4MuxerTrack;
 import org.jcodec.containers.mp4.muxer.MP4Muxer;
 import org.jcodec.scale.AWTUtil;
@@ -20,165 +18,177 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.IntStream;
 
+/**
+ * Parallel H.264 encoder using segment-based GOP encoding.
+ * Each image becomes an independent GOP (Group of Pictures) with one IDR frame
+ * followed by P-frames, enabling true parallel encoding.
+ */
 public class JCodecParallelEncoder {
+
+    /**
+     * Holds encoded packets for a single segment (one image's worth of frames).
+     *
+     * @param segmentIndex the index of this segment in the overall sequence
+     * @param packets      the encoded frame packets in Annex B format
+     */
+    record EncodedSegment(int segmentIndex, List<MP4Packet> packets) {}
 
     public JCodecParallelEncoder() {
     }
 
-    private static final MP4Packet POISON_PILL = getNullMp4Packet();
+    /**
+     * Encode a list of images into an MP4 video file.
+     *
+     * @param images         List of images to encode
+     * @param framesPerImage Number of frames to hold each image
+     * @param frameRate      Frame rate for the output video
+     * @param output         Output MP4 file
+     */
+    public void encode(List<BufferedImage> images, int framesPerImage, int frameRate, File output) {
+        if (images.isEmpty()) {
+            throw new IllegalArgumentException("Image list cannot be empty");
+        }
+        if (framesPerImage <= 0) {
+            throw new IllegalArgumentException("framesPerImage must be positive");
+        }
+        if (frameRate <= 0) {
+            throw new IllegalArgumentException("frameRate must be positive");
+        }
 
-    public void encode(List<BufferedImage> images, File output) throws RuntimeException {
-        BlockingQueue<MP4Packet> queue = new LinkedBlockingQueue<>(50);
+        System.out.printf("Encoding %d images, %d frames each @ %d fps%n", images.size(), framesPerImage, frameRate);
+
+        // Phase 1: Parallel encoding - each image becomes an independent segment
+        ConcurrentHashMap<Integer, EncodedSegment> segments = new ConcurrentHashMap<>();
+
+        IntStream.range(0, images.size())
+                .parallel()
+                .forEach(segmentIndex -> {
+                    BufferedImage img = images.get(segmentIndex);
+                    EncodedSegment segment = encodeSegment(img, segmentIndex, framesPerImage, frameRate);
+                    segments.put(segmentIndex, segment);
+                    System.out.printf("  Encoded segment %d/%d%n", segmentIndex + 1, images.size());
+                });
+
+        // Phase 2: Sequential muxing - write segments in order
+        System.out.println("Muxing segments...");
+        muxSegments(segments, images.size(), frameRate, output);
+    }
+
+    /**
+     * Encode a single segment (one image held for multiple frames).
+     * The H264Encoder naturally produces an IDR first frame followed by P-frames.
+     *
+     * @param img            the image to encode
+     * @param segmentIndex   the index of this segment
+     * @param framesPerImage number of frames to hold this image
+     * @param frameRate      frame rate (used as timescale)
+     * @return the encoded segment containing all frame packets
+     */
+    private EncodedSegment encodeSegment(BufferedImage img, int segmentIndex, int framesPerImage, int frameRate) {
+        H264Encoder encoder = H264Encoder.createH264Encoder();
+        List<MP4Packet> packets = new ArrayList<>(framesPerImage);
+
+        // Convert image to YUV once for the entire segment
+        Picture yuv = AWTUtil.fromBufferedImage(img, ColorSpace.YUV420J);
+
+        // Allocate buffer for encoded data
+        int bufferSize = img.getWidth() * img.getHeight() * 3;
+
+        for (int localFrame = 0; localFrame < framesPerImage; localFrame++) {
+            ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+
+            VideoEncoder.EncodedFrame encoded = encoder.encodeFrame(yuv, buffer);
+            boolean isKeyFrame = encoded.isKeyFrame();
+
+            ByteBuffer data = encoded.getData();
+
+            // Create packet with local frame number (remapped to global during muxing)
+            MP4Packet packet = new MP4Packet(
+                    data,                       // data (Annex B format)
+                    localFrame,                 // pts (local, remapped later)
+                    frameRate,                  // timescale
+                    1L,                         // duration
+                    localFrame,                 // frameNo (local)
+                    isKeyFrame ? Packet.FrameType.KEY : Packet.FrameType.INTER,
+                    null,                       // tapeTimecode
+                    localFrame,                 // displayOrder (local)
+                    localFrame,                 // mediaPts (local)
+                    0,                          // entryNo
+                    0L,                         // fileOff
+                    data.remaining(),           // size
+                    isKeyFrame                  // psync
+            );
+
+            packets.add(packet);
+        }
+
+        return new EncodedSegment(segmentIndex, packets);
+    }
+
+    /**
+     * Mux all segments into the final MP4 file in order.
+     *
+     * @param segments    map of segment index to encoded segment
+     * @param numSegments total number of segments
+     * @param frameRate   frame rate for the output video
+     * @param output      output MP4 file
+     */
+    private void muxSegments(ConcurrentHashMap<Integer, EncodedSegment> segments,
+                            int numSegments, int frameRate, File output) {
         try (SeekableByteChannel out = NIOUtils.writableFileChannel(output.getPath())) {
-
-            // 1. Initialize Muxer and Track (0.2.5 API style)
             MP4Muxer muxer = MP4Muxer.createMP4Muxer(out, Brand.MP4);
-            Size size = new Size(images.getFirst().getWidth(), images.getFirst().getHeight());
 
-            // In 0.2.5, addVideoTrack is the preferred way to set up the codec metadata
-            CodecMP4MuxerTrack track = (CodecMP4MuxerTrack) muxer.addVideoTrack(Codec.H264,
-                    VideoCodecMeta.createVideoCodecMeta("avc1", null, size, Rational.ONE));
+            // Initialize track - CodecMP4MuxerTrack will extract SPS/PPS
+            // from the Annex B data passed via addFrame()
+            Size size = new Size(1920, 1080);
+            CodecMP4MuxerTrack track = (CodecMP4MuxerTrack) muxer.addVideoTrack(
+                    Codec.H264,
+                    VideoCodecMeta.createVideoCodecMeta("avc1", null, size, Rational.ONE)
+            );
 
-            // 2. Consumer Thread (Sequential Writing)
-            Thread writerThread = startWriterThread(queue, track, muxer);
-
-            // 3. Producer (Parallel Encoding)
-            AtomicLong frameIdx = new AtomicLong(0);
-            images.parallelStream().forEachOrdered(img -> {
-                try {
-                    // Create encoder instance per thread
-                    H264Encoder encoder = H264Encoder.createH264Encoder();
-
-                    // Allocate buffer: width * height * 3
-                    ByteBuffer buffer = ByteBuffer.allocate(img.getWidth() * img.getHeight() * 3);
-                    Picture yuv = AWTUtil.fromBufferedImage(img, ColorSpace.YUV420J);
-
-                    // In 0.2.5, encodeFrame returns an EncodedFrame object
-                    VideoEncoder.EncodedFrame encoded = encoder.encodeFrame(yuv, buffer);
-                    ByteBuffer data = encoded.getData();
-                    boolean isKey = encoded.isKeyFrame();
-
-                    MP4Packet packet = getMp4Packet(frameIdx, data, isKey);
-
-                    queue.put(packet);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
+            // Write all segments in order
+            long globalFrame = 0;
+            for (int segmentIdx = 0; segmentIdx < numSegments; segmentIdx++) {
+                EncodedSegment segment = segments.get(segmentIdx);
+                if (segment == null) {
+                    throw new RuntimeException("Missing segment: " + segmentIdx);
                 }
-            });
 
-            queue.put(POISON_PILL);
-            writerThread.join();
-            NIOUtils.closeQuietly(out);
+                for (MP4Packet packet : segment.packets()) {
+                    // Pass raw Annex B data - CodecMP4MuxerTrack handles
+                    // NAL unit extraction and MP4 conversion internally
+                    ByteBuffer rawData = packet.getData().duplicate();
+
+                    MP4Packet globalPacket = new MP4Packet(
+                            rawData,
+                            globalFrame,                    // pts
+                            frameRate,                      // timescale
+                            1L,                             // duration
+                            globalFrame,                    // frameNo
+                            packet.getFrameType(),
+                            null,                           // tapeTimecode
+                            (int) globalFrame,              // displayOrder
+                            globalFrame,                    // mediaPts
+                            0,                              // entryNo
+                            0L,                             // fileOff
+                            rawData.remaining(),            // size
+                            packet.getFrameType() == Packet.FrameType.KEY  // psync
+                    );
+
+                    track.addFrame(globalPacket);
+                    globalFrame++;
+                }
+            }
+
+            muxer.finish();
+            System.out.printf("Wrote %d total frames%n", globalFrame);
+
         } catch (Exception e) {
-            System.err.println("Error opening \"" + output.getAbsolutePath() + "\" for write!");
+            System.err.println("Error writing to \"" + output.getAbsolutePath() + "\"");
             throw new RuntimeException(e);
         }
-    }
-
-    private static Thread startWriterThread(BlockingQueue<MP4Packet> queue, CodecMP4MuxerTrack track, MP4Muxer muxer) {
-        Thread writerThread = new Thread(() -> {
-            try {
-                boolean trackInitialized = false;
-                while (true) {
-                    MP4Packet packet = queue.take();
-                    if (packet == POISON_PILL) break;
-
-                    if (!trackInitialized) {
-                        // 1. Prepare lists for the metadata NAL units
-                        List<ByteBuffer> spsList = new ArrayList<>();
-                        List<ByteBuffer> ppsList = new ArrayList<>();
-
-                        // 2. Extract SPS and PPS from the Annex B buffer
-                        // H264Utils.nextNALUnit scans the buffer for start codes (00 00 00 01)
-                        ByteBuffer dup = packet.getData().duplicate();
-                        ByteBuffer nal;
-                        while ((nal = H264Utils.nextNALUnit(dup)) != null) {
-                            int type = nal.get() & 0x1f; // Get NAL unit type
-                            if (type == 7) { // SPS
-                                spsList.add(nal);
-                            } else if (type == 8) { // PPS
-                                ppsList.add(nal);
-                            }
-                        }
-
-                        // 3. Create the SampleEntry using the extracted lists
-                        // 4 is the standard nalLengthSize for MP4
-                        SampleEntry se = H264Utils.createMOVSampleEntryFromSpsPpsList(spsList, ppsList, 4);
-                        track.addSampleEntry(se);
-                        trackInitialized = true;
-                    }
-
-                    // 4. Transform Annex B to MP4 (ISO BMF) format before writing
-                    // MP4 requires 4-byte length prefixes instead of 00 00 00 01 start codes
-                    ByteBuffer mp4Data = H264Utils.encodeMOVPacket(packet.getData());
-                    MP4Packet mp4Packet = new MP4Packet(
-                            mp4Data,
-                            packet.getPts(),
-                            packet.getTimescale(),
-                            packet.getDuration(),
-                            packet.getFrameNo(),
-                            packet.getFrameType(),      // FrameType iframe (e.g., KEY, INTER, UNKNOWN)
-                            packet.getTapeTimecode(),
-                            (int) packet.getFrameNo(),  // displayOrder (usually matches frameNo for H264)
-                            packet.getMediaPts(),       // mediaPts
-                            0,                          // entryNo
-                            0,                          // fileOff (Muxer calculates this)
-                            mp4Data.remaining(),        // size
-                            true                        // psync
-                    );
-                    track.addFrame(mp4Packet);
-                }
-                muxer.finish();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-
-        // Start consumer thread!
-        writerThread.start();
-        return writerThread;
-    }
-
-    private static MP4Packet getMp4Packet(AtomicLong frameIdx, ByteBuffer data, boolean isKey) {
-        long idx = frameIdx.getAndIncrement();
-
-        // Map to the 13-argument MP4Packet constructor
-        return new MP4Packet(
-                data,                       // 1. data
-                idx,                        // 2. pts
-                25,                         // 3. timescale (den)
-                1L,                         // 4. duration (num)
-                idx,                        // 5. frameNo
-                isKey ? Packet.FrameType.KEY : Packet.FrameType.INTER, // 6. iframe (FrameType enum)
-                null,                       // 7. tapeTimecode
-                (int) idx,                  // 8. displayOrder
-                idx,                        // 9. mediaPts
-                0,                          // 10. entryNo
-                0L,                         // 11. fileOff
-                data.remaining(),           // 12. size
-                isKey                       // 13. psync
-        );
-    }
-
-    private static MP4Packet getNullMp4Packet() {
-        return new MP4Packet(
-                null,             // ByteBuffer data
-                0L,                    // long pts
-                0,                     // int timescale
-                0L,                    // long duration
-                0L,                    // long frameNo
-                Packet.FrameType.KEY,  // FrameType iframe
-                null,                  // TapeTimecode tapeTimecode
-                0,                     // int displayOrder
-                0L,                    // long mediaPts
-                0,                     // int entryNo
-                0L,                    // long fileOff
-                0,                     // int size
-                true                   // boolean psync
-        );
     }
 }

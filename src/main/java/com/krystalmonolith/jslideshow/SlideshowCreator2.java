@@ -7,14 +7,14 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.IntStream;
 
 /**
- * Creates a video slideshow from JPG images with dissolve transitions.
- * Pure Java implementation using JCodec.
+ * Creates a video slideshow from JPG images using parallel encoding.
+ * Pure Java implementation using JCodec with segment-based GOP encoding.
  */
 public class SlideshowCreator2 {
 
@@ -23,9 +23,9 @@ public class SlideshowCreator2 {
      */
     public static final double DEFAULT_DURATION = 3.0;
     /**
-     * Default transition duration in seconds
+     * Default transition duration in seconds (currently unused - transitions disabled)
      */
-    public static final double DEFAULT_TRANSITION = 0.75;
+    public static final double DEFAULT_TRANSITION = 0.0;
     /**
      * Default frames per second
      */
@@ -36,10 +36,6 @@ public class SlideshowCreator2 {
      */
     private final double duration;
     /**
-     * transition duration in seconds
-     */
-    private final double transition;
-    /**
      * frames per second
      */
     private final int frameRate;
@@ -48,29 +44,35 @@ public class SlideshowCreator2 {
      * Default Constructor using default values.
      */
     public SlideshowCreator2() {
-        this(DEFAULT_DURATION, DEFAULT_TRANSITION, DEFAULT_FRAME_RATE);
+        this(DEFAULT_DURATION, DEFAULT_FRAME_RATE);
     }
 
     /**
      * Constructor with configurable parameters.
      *
      * @param duration   seconds per image
-     * @param transition transition duration in seconds
      * @param frameRate  frames per second
      * @throws IllegalArgumentException if parameters are invalid
      */
-    public SlideshowCreator2(double duration, double transition, int frameRate) {
-        if (duration < 0) throw new IllegalArgumentException("duration must be >= 0");
-        if (transition < 0) throw new IllegalArgumentException("transition must be >= 0");
-        if (duration == 0 && transition == 0)
-            throw new IllegalArgumentException("duration and transition cannot both be zero");
+    public SlideshowCreator2(double duration, int frameRate) {
+        if (duration <= 0) throw new IllegalArgumentException("duration must be > 0");
         if (frameRate <= 0) throw new IllegalArgumentException("frameRate must be positive");
-        if (duration < transition) {
-            System.out.println("Note: transition is longer than duration; images will only appear during transitions");
-        }
         this.duration = duration;
-        this.transition = transition;
         this.frameRate = frameRate;
+    }
+
+    /**
+     * Legacy constructor for backward compatibility (transition parameter ignored).
+     *
+     * @param duration   seconds per image
+     * @param transition ignored (transitions not yet supported in parallel encoder)
+     * @param frameRate  frames per second
+     */
+    public SlideshowCreator2(double duration, double transition, int frameRate) {
+        this(duration, frameRate);
+        if (transition > 0) {
+            System.out.println("Note: Dissolve transitions not yet supported in parallel encoder; using hard cuts");
+        }
     }
 
     /**
@@ -105,75 +107,52 @@ public class SlideshowCreator2 {
         // Generate timestamped output filename
         var outputFile = generateOutputFilename();
 
+        // Calculate frames per image
+        int framesPerImage = (int) (duration * frameRate);
+
         System.out.printf("Processing directory: %s%n", directoryPath.toAbsolutePath());
         System.out.printf("Found %d images%n", imageFiles.length);
-        System.out.printf("Output file: %s\n%n", outputFile);
+        System.out.printf("Duration: %.2f seconds per image (%d frames @ %d fps)%n", duration, framesPerImage, frameRate);
+        System.out.printf("Output file: %s%n%n", outputFile);
 
-        // Create encoder
-//        var encoder = SequenceEncoder.createSequenceEncoder(new File(outputFile), frameRate);
+        // Load all images
+        List<BufferedImage> images = loadImages(imageFiles);
 
-        try {
-            BufferedImage initialImage = ImageIO.read(imageFiles[0]);
-            var blackImage = createBlackImage(initialImage.getWidth(), initialImage.getHeight());
+        // Encode using parallel segment-based encoder
+        JCodecParallelEncoder encoder = new JCodecParallelEncoder();
+        encoder.encode(images, framesPerImage, frameRate, new File(outputFile));
 
-            List<BufferedImage> imageList =
-                    IntStream.range(0, imageFiles.length)
-                            .mapToObj((int i) -> { // Emit two File(s) in an array: [ currentFile, nameFile ]
-                                File currentFile = null;
-                                File nextFile = null;
-                                if (i == 0) {
-                                    nextFile = imageFiles[i];
-                                } else {
-                                    if (i < imageFiles.length - 1) {
-                                        currentFile = imageFiles[i - 1];
-                                        nextFile = imageFiles[i];
-                                    } else {
-                                        currentFile = imageFiles[i];
-                                    }
-                                }
-                                return new File[]{currentFile, nextFile};
-                            })
-                            .map((File[] files) -> {
-                                try {
-                                    File currentFile = files[0];
-                                    File nextFile = files[1];
-                                    BufferedImage currentImage = null;
-                                    BufferedImage nextImage = null;
-                                    if (currentFile == null) {
-                                        nextImage = ImageIO.read(nextFile);
-                                        currentImage = createBlackImage(nextImage.getWidth(), nextImage.getHeight());
-                                    } else {
-                                        if (nextFile == null) {
-                                            currentImage = ImageIO.read(currentFile);
-                                            nextImage = createBlackImage(currentImage.getWidth(), currentImage.getHeight());
-                                        } else {
-                                            currentImage = ImageIO.read(currentFile);
-                                            nextImage = ImageIO.read(nextFile);
-                                        }
-                                    }
-                                    return new BufferedImage[]{currentImage, nextImage};
-                                } catch (IOException e) {
-                                    throw new RuntimeException(e);
-                                }
+        // Calculate elapsed time
+        var endTime = System.currentTimeMillis();
+        var elapsedSeconds = (endTime - startTime) / 1000.0;
 
-                            })
-                            .map(bufferedImages -> bufferedImages[0])
-                            .toList();
+        System.out.println();
+        System.out.printf("Success! Created %s%n", outputFile);
+        System.out.printf("Total processing time: %.2f seconds%n", elapsedSeconds);
+    }
 
-            JCodecParallelEncoder encoder = new JCodecParallelEncoder();
-            encoder.encode(imageList, new File(outputFile));
-
-            // Calculate elapsed time
-            var endTime = System.currentTimeMillis();
-            var elapsedSeconds = (endTime - startTime) / 1000.0;
-
-            System.out.println();
-            System.out.printf("Success! Created %s%n", outputFile);
-            System.out.printf("Total processing time: %.2f seconds%n", elapsedSeconds);
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+    /**
+     * Load all image files into memory.
+     *
+     * @param imageFiles Array of image files to load
+     * @return List of BufferedImage objects
+     */
+    private List<BufferedImage> loadImages(File[] imageFiles) {
+        List<BufferedImage> images = new ArrayList<>(imageFiles.length);
+        for (File file : imageFiles) {
+            try {
+                BufferedImage img = ImageIO.read(file);
+                if (img != null) {
+                    images.add(img);
+                    System.out.printf("  Loaded: %s (%dx%d)%n", file.getName(), img.getWidth(), img.getHeight());
+                } else {
+                    System.err.printf("  Warning: Could not read %s%n", file.getName());
+                }
+            } catch (IOException e) {
+                System.err.printf("  Error loading %s: %s%n", file.getName(), e.getMessage());
+            }
         }
+        return images;
     }
 
     /**
@@ -194,17 +173,4 @@ public class SlideshowCreator2 {
         Arrays.sort(files, Comparator.comparing(File::getName));
         return files;
     }
-
-    /**
-     * Create a black image with the specified dimensions.
-     * TYPE_INT_RGB initializes all pixels to black (0,0,0) by default.
-     *
-     * @param width  Width of the image in pixels
-     * @param height Height of the image in pixels
-     * @return A new BufferedImage filled with black
-     */
-    private BufferedImage createBlackImage(int width, int height) {
-        return new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-    }
-
 }
