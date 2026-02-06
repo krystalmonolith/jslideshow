@@ -14,7 +14,7 @@ JSlideshow is a pure Java command-line application that creates MP4 video slides
 java -cp "$MAVEN_HOME/boot/plexus-classworlds-2.9.0.jar" -Dclassworlds.conf="$MAVEN_HOME/bin/m2.conf" -Dmaven.home="$MAVEN_HOME" -Dmaven.multiModuleProjectDirectory="$PWD" org.codehaus.plexus.classworlds.launcher.Launcher clean package -DskipTests
 
 # Run the application
-java -jar target/jslideshow-1.3.3-jar-with-dependencies.jar <directory> [duration] [transition] [frameRate]
+java -jar target/jslideshow-1.3.4-jar-with-dependencies.jar <directory> [duration] [transition] [frameRate]
 ```
 
 ## Architecture
@@ -59,7 +59,7 @@ These can be overridden via optional command line arguments: `[duration] [transi
 ## Fast Test
 
 ```bash
-java -jar target/jslideshow-1.3.3-jar-with-dependencies.jar images 5.0 0 30
+java -jar target/jslideshow-1.3.4-jar-with-dependencies.jar images 5.0 0 30
 ```
 
 ## Bump Version
