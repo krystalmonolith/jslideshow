@@ -118,7 +118,7 @@ public class SlideshowCreator2 {
             throw new IllegalStateException("No .JPG or .jpg files found in: " + directoryPath);
         }
 
-        int holdFrames = (int) ((duration - transition) * frameRate);
+        int holdFrames = (int) (duration * frameRate);
         int transitionFrames = (int) (transition * frameRate);
 
         System.out.printf("Processing directory: %s%n", directoryPath.toAbsolutePath());
