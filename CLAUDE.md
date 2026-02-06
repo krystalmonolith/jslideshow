@@ -18,6 +18,7 @@ java -jar target/jslideshow-1.3.4-jar-with-dependencies.jar [options] <directory
 #   -d, --duration <seconds>     Seconds per image (default: 3.0)
 #   -t, --transition <seconds>   Transition duration (default: 0.75)
 #   -f, --frame-rate <fps>       Frame rate (default: 30)
+#   -o, --output <path>          Output MP4 file path (default: timestamped filename)
 #   -h, --help                   Show help
 #   -V, --version                Show version
 ```
@@ -60,7 +61,7 @@ These can be overridden via command line options: `-d`, `-t`, `-f`
 
 - Container: MP4
 - Codec: H.264
-- Filename pattern: `YYYYMMDD'T'HHmmss-output.mp4`
+- Default filename pattern: `YYYYMMDD'T'HHmmss-output.mp4` (override with `-o`)
 
 ## Fast Test
 
