@@ -19,6 +19,7 @@ java -jar target/jslideshow-1.3.4-jar-with-dependencies.jar [options] <directory
 #   -t, --transition <seconds>   Transition duration (default: 0.75)
 #   -f, --frame-rate <fps>       Frame rate (default: 30)
 #   -o, --output <path>          Output MP4 file path (default: timestamped filename)
+#   -b, --batchsize <n>          Parallel encoding batch size (default: available processors)
 #   -h, --help                   Show help
 #   -V, --version                Show version
 ```
@@ -66,8 +67,9 @@ These can be overridden via command line options: `-d`, `-t`, `-f`
 ## Test Profiles
 
 ```bash
-mvn package exec:java -Pfasttest    # images/          → fasttest.mp4
+mvn package exec:java -Pfasttest     # images/                → fasttest.mp4
 mvn package exec:java -Pslowtest    # images/images1080/      → slowtest.mp4
+mvn package exec:java -Psnailtest   # images/images1080/      → snailtest.mp4  (batchsize=1)
 mvn package exec:java -Phugetest    # images/images-original/ → hugetest.mp4
 ```
 
