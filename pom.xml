@@ -216,6 +216,8 @@
                                 <argument>0</argument>
                                 <argument>-f</argument>
                                 <argument>30</argument>
+                                <argument>-o</argument>
+                                <argument>fasttest.mp4</argument>
                                 <argument>images</argument>
                             </arguments>
                         </configuration>
@@ -236,6 +238,8 @@
                         <configuration>
                             <mainClass>com.krystalmonolith.jslideshow.Main</mainClass>
                             <arguments>
+                                <argument>-o</argument>
+                                <argument>slowtest.mp4</argument>
                                 <argument>images/images1080</argument>
                             </arguments>
                         </configuration>
@@ -262,6 +266,8 @@
                                 <argument>1.0</argument>
                                 <argument>-f</argument>
                                 <argument>10</argument>
+                                <argument>-o</argument>
+                                <argument>hugetest.mp4</argument>
                                 <argument>images/images-original</argument>
                             </arguments>
                         </configuration>

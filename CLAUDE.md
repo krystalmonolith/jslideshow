@@ -63,14 +63,12 @@ These can be overridden via command line options: `-d`, `-t`, `-f`
 - Codec: H.264
 - Default filename pattern: `YYYYMMDD'T'HHmmss-output.mp4` (override with `-o`)
 
-## Fast Test
+## Test Profiles
 
 ```bash
-# Via Maven profile (builds + runs)
-mvn package exec:java -Pfasttest
-
-# Or directly via JAR
-java -jar target/jslideshow-1.3.4-jar-with-dependencies.jar -d 5.0 -t 0 -f 30 images
+mvn package exec:java -Pfasttest    # images/          → fasttest.mp4
+mvn package exec:java -Pslowtest    # images/images1080/      → slowtest.mp4
+mvn package exec:java -Phugetest    # images/images-original/ → hugetest.mp4
 ```
 
 ## Bump Version
