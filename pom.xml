@@ -248,6 +248,30 @@
             </build>
         </profile>
 
+        <!-- Snail test profile: mvn package exec:java -Psnailtest Batch Size of One .aka. Sequential Encoding -->
+        <profile>
+            <id>snailtest</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.5.0</version>
+                        <configuration>
+                            <mainClass>com.krystalmonolith.jslideshow.Main</mainClass>
+                            <arguments>
+                                <argument>--batchsize</argument>
+                                <argument>1</argument>
+                                <argument>-o</argument>
+                                <argument>snailtest.mp4</argument>
+                                <argument>images/images1080</argument>
+                            </arguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
         <!-- Huge test profile: mvn package exec:java -Phugetest -->
         <profile>
             <id>hugetest</id>

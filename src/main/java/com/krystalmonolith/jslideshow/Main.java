@@ -47,6 +47,10 @@ public class Main implements Callable<Integer> {
             description = "Output MP4 file path (default: timestamped filename).")
     private String output;
 
+    @Option(names = {"-b", "--batchsize"},
+            description = "Parallel encoding batch size (default: number of available processors).")
+    private Integer batchSize;
+
     @Override
     public Integer call() throws Exception {
         if (!directory.toFile().exists()) {
@@ -59,16 +63,30 @@ public class Main implements Callable<Integer> {
             return 1;
         }
 
+        int maxBatchSize = Runtime.getRuntime().availableProcessors();
+        int effectiveBatchSize = maxBatchSize;
+
+        if (batchSize != null) {
+            if (batchSize < 1 || batchSize > maxBatchSize) {
+                System.err.printf("Error: Invalid batch size %d. " +
+                        "On this system, -b/--batchsize must be between 1 and %d " +
+                        "(%d available processors).%n", batchSize, maxBatchSize, maxBatchSize);
+                return 1;
+            }
+            effectiveBatchSize = batchSize;
+        }
+
         System.out.println("Parameters:");
         System.out.printf("  Duration:   %.2f seconds%n", duration);
         System.out.printf("  Transition: %.2f seconds%n", transition);
-        System.out.printf("  Frame rate: %d fps%n%n", frameRate);
+        System.out.printf("  Frame rate: %d fps%n", frameRate);
+        System.out.printf("  Batch size: %d%n%n", effectiveBatchSize);
 
         var creator = new SlideshowCreator2(duration, transition, frameRate);
         if (output != null) {
-            creator.createSlideshow(directory, new File(output));
+            creator.createSlideshow(directory, new File(output), effectiveBatchSize);
         } else {
-            creator.createSlideshow(directory);
+            creator.createSlideshow(directory, effectiveBatchSize);
         }
         return 0;
     }

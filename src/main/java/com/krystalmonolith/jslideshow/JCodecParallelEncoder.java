@@ -242,16 +242,16 @@ public class JCodecParallelEncoder {
      * @param transitionFrames number of frames for each transition
      * @param frameRate        frame rate for the output video
      * @param output           output MP4 file
+     * @param batchSize        parallel encoding batch size
      */
     public void encode(File[] imageFiles, int holdFrames, int transitionFrames,
-                       int frameRate, File output) throws Exception {
+                       int frameRate, File output, int batchSize) throws Exception {
         if (imageFiles.length == 0) {
             throw new IllegalArgumentException("Image file list cannot be empty");
         }
 
         List<SegmentSpec> allSpecs = buildSegmentSpecs(imageFiles.length, holdFrames, transitionFrames);
         int totalSegments = allSpecs.size();
-        int batchSize = Runtime.getRuntime().availableProcessors();
 
         long totalFrames = allSpecs.stream().mapToLong(SegmentSpec::frameCount).sum();
         System.out.printf("Encoding %d images into %d segments (%d total frames) @ %d fps%n",

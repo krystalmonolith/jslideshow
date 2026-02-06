@@ -80,13 +80,25 @@ public class SlideshowCreator2 {
     }
 
     /**
-     * Make a slide show video using a generated timestamped output filename.
+     * Make a slide show video using defaults for output filename and batch size.
      *
      * @param directoryPath Path of a directory containing one or more *.JPG or *.jpg files.
      * @throws Exception on error creating the video
      */
     public void createSlideshow(Path directoryPath) throws Exception {
-        createSlideshow(directoryPath, new File(generateOutputFilename()));
+        createSlideshow(directoryPath, new File(generateOutputFilename()),
+                Runtime.getRuntime().availableProcessors());
+    }
+
+    /**
+     * Make a slide show video using a generated timestamped output filename.
+     *
+     * @param directoryPath Path of a directory containing one or more *.JPG or *.jpg files.
+     * @param batchSize     parallel encoding batch size
+     * @throws Exception on error creating the video
+     */
+    public void createSlideshow(Path directoryPath, int batchSize) throws Exception {
+        createSlideshow(directoryPath, new File(generateOutputFilename()), batchSize);
     }
 
     /**
@@ -94,9 +106,10 @@ public class SlideshowCreator2 {
      *
      * @param directoryPath Path of a directory containing one or more *.JPG or *.jpg files.
      * @param outputFile    the output MP4 file to write
+     * @param batchSize     parallel encoding batch size
      * @throws Exception on error creating the video
      */
-    public void createSlideshow(Path directoryPath, File outputFile) throws Exception {
+    public void createSlideshow(Path directoryPath, File outputFile, int batchSize) throws Exception {
         var startTime = System.currentTimeMillis();
 
         var imageFiles = findImageFiles(directoryPath);
@@ -115,7 +128,7 @@ public class SlideshowCreator2 {
         System.out.printf("Output file: %s%n%n", outputFile.getPath());
 
         JCodecParallelEncoder encoder = new JCodecParallelEncoder();
-        encoder.encode(imageFiles, holdFrames, transitionFrames, frameRate, outputFile);
+        encoder.encode(imageFiles, holdFrames, transitionFrames, frameRate, outputFile, batchSize);
 
         var endTime = System.currentTimeMillis();
         var elapsedSeconds = (endTime - startTime) / 1000.0;
