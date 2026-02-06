@@ -134,8 +134,26 @@ public class SlideshowCreator2 {
         var elapsedSeconds = (endTime - startTime) / 1000.0;
 
         System.out.println();
-        System.out.printf("Success! Created %s%n", outputFile.getPath());
+        System.out.printf("Success! Created %s (%s)%n", outputFile.getPath(), humanReadableSize(outputFile.length()));
         System.out.printf("Total processing time: %.2f seconds%n", elapsedSeconds);
+    }
+
+    /**
+     * Format a byte count as a human-readable size string (e.g. "1.2M", "350K", "2.5G").
+     *
+     * @param bytes the file size in bytes
+     * @return human-readable size string
+     */
+    private static String humanReadableSize(long bytes) {
+        if (bytes >= 1_073_741_824L) {
+            return "%.1fG".formatted(bytes / 1_073_741_824.0);
+        } else if (bytes >= 1_048_576L) {
+            return "%.1fM".formatted(bytes / 1_048_576.0);
+        } else if (bytes >= 1024L) {
+            return "%.1fK".formatted(bytes / 1024.0);
+        } else {
+            return bytes + "B";
+        }
     }
 
     /**
