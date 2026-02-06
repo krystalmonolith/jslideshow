@@ -50,6 +50,8 @@ public static final int DEFAULT_FRAME_RATE = 30;         // frames per second
 
 The output filename is automatically generated with a timestamp (`YYYYMMDD'T'HHmmss-output.mp4`) unless overridden with `-o`.
 
+**Parameter validation:** If the combination of duration, transition, and frame rate produces zero frames, the program will exit with an error. For example, `-d 0.1 -t 0 -f 1` produces 0 hold frames and 0 transition frames at 1 fps. Warnings are shown when only hold or transition frames round to zero.
+
 ## Example Output
 
 ```
@@ -61,22 +63,22 @@ Parameters:
 
 Processing directory: /home/user/photos/vacation
 Found 5 images
-Duration: 5.00 seconds per image (75 hold frames @ 30 fps)
+Duration: 5.00 seconds per image (150 hold frames @ 30 fps)
 Transition: 2.50 seconds (75 frames)
 Output file: 20260128T175406-output.mp4
 
-Encoding 5 images into 11 segments (825 total frames) @ 30 fps
+Encoding 5 images into 11 segments (1200 total frames) @ 30 fps
 Batch size: 20 (parallel threads)
   Loaded: DSC_7141_1920x1080.JPG (1620x1080)
   Loaded: DSC_7145_1920x1080.JPG (1620x1080)
   Loaded: DSC_7151_1920x1080.JPG (1620x1080)
   Loaded: DSC_7155_1920x1080.JPG (1620x1080)
   Loaded: DSC_7161_1920x1080.JPG (1620x1080)
-  Encoded segment 2/11 (HOLD, 75 frames)
-  Encoded segment 10/11 (HOLD, 75 frames)
-  Encoded segment 6/11 (HOLD, 75 frames)
-  Encoded segment 4/11 (HOLD, 75 frames)
-  Encoded segment 8/11 (HOLD, 75 frames)
+  Encoded segment 2/11 (HOLD, 150 frames)
+  Encoded segment 10/11 (HOLD, 150 frames)
+  Encoded segment 6/11 (HOLD, 150 frames)
+  Encoded segment 4/11 (HOLD, 150 frames)
+  Encoded segment 8/11 (HOLD, 150 frames)
   Encoded segment 9/11 (DISSOLVE, 75 frames)
   Encoded segment 3/11 (DISSOLVE, 75 frames)
   Encoded segment 7/11 (DISSOLVE, 75 frames)
@@ -87,9 +89,9 @@ Batch size: 20 (parallel threads)
   Muxed segment 2/11
   ...
   Muxed segment 11/11
-Wrote 825 total frames
+Wrote 1200 total frames
 
-Success! Created 20260128T175406-output.mp4
+Success! Created 20260128T175406-output.mp4 (29.3M)
 Total processing time: 13.78 seconds
 ```
 

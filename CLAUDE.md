@@ -47,6 +47,8 @@ public static final int DEFAULT_FRAME_RATE = 30;         // frames per second
 
 These can be overridden via command line options: `-d`, `-t`, `-f`
 
+**Frame validation:** If duration and transition both produce 0 frames at the given frame rate, the program errors out. Warnings are shown when only one rounds to zero.
+
 ## Dependencies
 
 - **JCodec 0.2.5** - Pure Java H.264/MP4 video encoding
