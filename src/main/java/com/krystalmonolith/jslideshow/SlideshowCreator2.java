@@ -121,6 +121,20 @@ public class SlideshowCreator2 {
         int holdFrames = (int) (duration * frameRate);
         int transitionFrames = (int) (transition * frameRate);
 
+        if (holdFrames == 0 && transitionFrames == 0) {
+            throw new IllegalArgumentException(
+                    "Error: Duration %.2f seconds and transition %.2f seconds at %d fps both produce 0 frames. Increase duration, transition, or frame rate."
+                            .formatted(duration, transition, frameRate));
+        }
+        if (holdFrames == 0) {
+            System.out.printf("Warning: Duration %.2f seconds at %d fps produces 0 hold frames; images will only appear during transitions.%n",
+                    duration, frameRate);
+        }
+        if (transitionFrames == 0 && transition > 0) {
+            System.out.printf("Warning: Transition %.2f seconds at %d fps produces 0 transition frames; transitions will be hard cuts.%n",
+                    transition, frameRate);
+        }
+
         System.out.printf("Processing directory: %s%n", directoryPath.toAbsolutePath());
         System.out.printf("Found %d images%n", imageFiles.length);
         System.out.printf("Duration: %.2f seconds per image (%d hold frames @ %d fps)%n", duration, holdFrames, frameRate);

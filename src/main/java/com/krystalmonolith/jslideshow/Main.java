@@ -82,11 +82,16 @@ public class Main implements Callable<Integer> {
         System.out.printf("  Frame rate: %d fps%n", frameRate);
         System.out.printf("  Batch size: %d%n%n", effectiveBatchSize);
 
-        var creator = new SlideshowCreator2(duration, transition, frameRate);
-        if (output != null) {
-            creator.createSlideshow(directory, new File(output), effectiveBatchSize);
-        } else {
-            creator.createSlideshow(directory, effectiveBatchSize);
+        try {
+            var creator = new SlideshowCreator2(duration, transition, frameRate);
+            if (output != null) {
+                creator.createSlideshow(directory, new File(output), effectiveBatchSize);
+            } else {
+                creator.createSlideshow(directory, effectiveBatchSize);
+            }
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            System.err.println(e.getMessage());
+            return 1;
         }
         return 0;
     }
