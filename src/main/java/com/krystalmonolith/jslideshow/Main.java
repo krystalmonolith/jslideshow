@@ -5,6 +5,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Path;
@@ -42,6 +43,10 @@ public class Main implements Callable<Integer> {
             defaultValue = "30")
     private int frameRate;
 
+    @Option(names = {"-o", "--output"},
+            description = "Output MP4 file path (default: timestamped filename).")
+    private String output;
+
     @Override
     public Integer call() throws Exception {
         if (!directory.toFile().exists()) {
@@ -60,7 +65,11 @@ public class Main implements Callable<Integer> {
         System.out.printf("  Frame rate: %d fps%n%n", frameRate);
 
         var creator = new SlideshowCreator2(duration, transition, frameRate);
-        creator.createSlideshow(directory);
+        if (output != null) {
+            creator.createSlideshow(directory, new File(output));
+        } else {
+            creator.createSlideshow(directory);
+        }
         return 0;
     }
 

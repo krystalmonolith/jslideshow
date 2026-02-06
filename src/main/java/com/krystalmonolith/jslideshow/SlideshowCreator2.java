@@ -80,12 +80,23 @@ public class SlideshowCreator2 {
     }
 
     /**
-     * Make a slide show video!
+     * Make a slide show video using a generated timestamped output filename.
      *
      * @param directoryPath Path of a directory containing one or more *.JPG or *.jpg files.
      * @throws Exception on error creating the video
      */
     public void createSlideshow(Path directoryPath) throws Exception {
+        createSlideshow(directoryPath, new File(generateOutputFilename()));
+    }
+
+    /**
+     * Make a slide show video!
+     *
+     * @param directoryPath Path of a directory containing one or more *.JPG or *.jpg files.
+     * @param outputFile    the output MP4 file to write
+     * @throws Exception on error creating the video
+     */
+    public void createSlideshow(Path directoryPath, File outputFile) throws Exception {
         var startTime = System.currentTimeMillis();
 
         var imageFiles = findImageFiles(directoryPath);
@@ -94,8 +105,6 @@ public class SlideshowCreator2 {
             throw new IllegalStateException("No .JPG or .jpg files found in: " + directoryPath);
         }
 
-        var outputFile = generateOutputFilename();
-
         int holdFrames = (int) ((duration - transition) * frameRate);
         int transitionFrames = (int) (transition * frameRate);
 
@@ -103,16 +112,16 @@ public class SlideshowCreator2 {
         System.out.printf("Found %d images%n", imageFiles.length);
         System.out.printf("Duration: %.2f seconds per image (%d hold frames @ %d fps)%n", duration, holdFrames, frameRate);
         System.out.printf("Transition: %.2f seconds (%d frames)%n", transition, transitionFrames);
-        System.out.printf("Output file: %s%n%n", outputFile);
+        System.out.printf("Output file: %s%n%n", outputFile.getPath());
 
         JCodecParallelEncoder encoder = new JCodecParallelEncoder();
-        encoder.encode(imageFiles, holdFrames, transitionFrames, frameRate, new File(outputFile));
+        encoder.encode(imageFiles, holdFrames, transitionFrames, frameRate, outputFile);
 
         var endTime = System.currentTimeMillis();
         var elapsedSeconds = (endTime - startTime) / 1000.0;
 
         System.out.println();
-        System.out.printf("Success! Created %s%n", outputFile);
+        System.out.printf("Success! Created %s%n", outputFile.getPath());
         System.out.printf("Total processing time: %.2f seconds%n", elapsedSeconds);
     }
 
