@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -33,6 +34,17 @@ import java.util.concurrent.atomic.AtomicReference;
  * dissolve transitions, fade in/out, and an async muxer thread.
  */
 public class JCodecParallelEncoder {
+
+    private static final char[] SPINNER = {'|', '/', '-', '\\'};
+    private static final AtomicInteger spinnerIndex = new AtomicInteger(0);
+
+    private static void spin() {
+        System.out.print("\b" + SPINNER[spinnerIndex.getAndIncrement() & 3]);
+    }
+
+    private static void clearSpinner() {
+        System.out.print("\b \b");
+    }
 
     enum SegmentType { FADE_IN, HOLD, DISSOLVE, FADE_OUT }
 
@@ -167,6 +179,7 @@ public class JCodecParallelEncoder {
             );
 
             packets.add(packet);
+            spin();
         }
 
         return new EncodedSegment(segmentIndex, packets);
@@ -203,7 +216,8 @@ public class JCodecParallelEncoder {
                     throw new IOException("Could not read image: " + imageFiles[idx].getName());
                 }
                 imageCache.put(idx, img);
-                System.out.printf("  Loaded: %s (%dx%d)%n", imageFiles[idx].getName(), img.getWidth(), img.getHeight());
+                clearSpinner();
+                System.out.printf("%n  Loaded: %s (%dx%d)  ", imageFiles[idx].getName(), img.getWidth(), img.getHeight());
             }
         }
     }
@@ -279,7 +293,8 @@ public class JCodecParallelEncoder {
                 batch.parallelStream().forEach(spec -> {
                     EncodedSegment segment = encodeOneSegment(spec, imageCache, frameRate);
                     completedSegments.put(segment.segmentIndex(), segment);
-                    System.out.printf("  Encoded segment %d/%d (%s, %d frames)%n",
+                    clearSpinner();
+                    System.out.printf("%n  Encoded segment %d/%d (%s, %d frames)  ",
                             spec.segmentIndex() + 1, totalSegments, spec.type(), spec.frameCount());
                     synchronized (muxerLock) {
                         muxerLock.notifyAll();
@@ -354,7 +369,8 @@ public class JCodecParallelEncoder {
                         track.addFrame(globalPacket);
                         globalFrame++;
                     }
-                    System.out.printf("  Muxed segment %d/%d%n", nextExpected + 1, totalSegments);
+                    clearSpinner();
+                    System.out.printf("%n  Muxed segment %d/%d  ", nextExpected + 1, totalSegments);
                     nextExpected++;
                 }
 
@@ -369,7 +385,8 @@ public class JCodecParallelEncoder {
             }
 
             muxer.finish();
-            System.out.printf("Wrote %d total frames%n", globalFrame);
+            clearSpinner();
+            System.out.printf("%nWrote %d total frames%n", globalFrame);
 
         } catch (Exception e) {
             System.err.println("Error writing to \"" + output.getAbsolutePath() + "\"");
