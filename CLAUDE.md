@@ -29,6 +29,7 @@ java -jar target/jslideshow-1.3.3-jar-with-dependencies.jar <directory> [duratio
   - `encodeDissolveSegment()` - Encodes alpha-blended transition between two images
   - `encodeFadeSegment()` - Encodes fade in/out by dissolving with a black image
   - `muxerLoop()` - Async thread that drains consecutive segments to MP4
+  - `spin()` / `clearSpinner()` - Animated text spinner (`|/-\`) showing per-frame encoding progress
 
 **Default configuration constants** at top of `SlideshowCreator2.java`:
 ```java
