@@ -29,6 +29,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <jcodec.version>0.2.5</jcodec.version>
+        <picocli.version>4.7.6</picocli.version>
     </properties>
 
     <dependencies>
@@ -85,6 +86,13 @@
             <scope>compile</scope>
         </dependency>
 
+        <!-- picocli for CLI argument parsing -->
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>${picocli.version}</version>
+        </dependency>
+
         <!-- JUnit 6 for testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -118,6 +126,9 @@
                         <manifest>
                             <mainClass>com.krystalmonolith.jslideshow.Main</mainClass>
                         </manifest>
+                        <manifestEntries>
+                            <Implementation-Version>${project.version}</Implementation-Version>
+                        </manifestEntries>
                     </archive>
                 </configuration>
             </plugin>
@@ -132,6 +143,9 @@
                         <manifest>
                             <mainClass>com.krystalmonolith.jslideshow.Main</mainClass>
                         </manifest>
+                        <manifestEntries>
+                            <Implementation-Version>${project.version}</Implementation-Version>
+                        </manifestEntries>
                     </archive>
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
@@ -182,6 +196,80 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Fast test profile: mvn package exec:java -Pfasttest -->
+        <profile>
+            <id>fasttest</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.5.0</version>
+                        <configuration>
+                            <mainClass>com.krystalmonolith.jslideshow.Main</mainClass>
+                            <arguments>
+                                <argument>-d</argument>
+                                <argument>5.0</argument>
+                                <argument>-t</argument>
+                                <argument>0</argument>
+                                <argument>-f</argument>
+                                <argument>30</argument>
+                                <argument>images</argument>
+                            </arguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Slow test profile: mvn package exec:java -Pslowtest -->
+        <profile>
+            <id>slowtest</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.5.0</version>
+                        <configuration>
+                            <mainClass>com.krystalmonolith.jslideshow.Main</mainClass>
+                            <arguments>
+                                <argument>images/images1080</argument>
+                            </arguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Huge test profile: mvn package exec:java -Phugetest -->
+        <profile>
+            <id>hugetest</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.5.0</version>
+                        <configuration>
+                            <mainClass>com.krystalmonolith.jslideshow.Main</mainClass>
+                            <arguments>
+                                <argument>-d</argument>
+                                <argument>4.0</argument>
+                                <argument>-t</argument>
+                                <argument>1.0</argument>
+                                <argument>-f</argument>
+                                <argument>10</argument>
+                                <argument>images/images-original</argument>
+                            </arguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <!-- Reporting section for maven site -->
     <reporting>

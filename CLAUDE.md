@@ -14,14 +14,19 @@ JSlideshow is a pure Java command-line application that creates MP4 video slides
 java -cp "$MAVEN_HOME/boot/plexus-classworlds-2.9.0.jar" -Dclassworlds.conf="$MAVEN_HOME/bin/m2.conf" -Dmaven.home="$MAVEN_HOME" -Dmaven.multiModuleProjectDirectory="$PWD" org.codehaus.plexus.classworlds.launcher.Launcher clean package -DskipTests
 
 # Run the application
-java -jar target/jslideshow-1.3.4-jar-with-dependencies.jar <directory> [duration] [transition] [frameRate]
+java -jar target/jslideshow-1.3.4-jar-with-dependencies.jar [options] <directory>
+#   -d, --duration <seconds>     Seconds per image (default: 3.0)
+#   -t, --transition <seconds>   Transition duration (default: 0.75)
+#   -f, --frame-rate <fps>       Frame rate (default: 30)
+#   -h, --help                   Show help
+#   -V, --version                Show version
 ```
 
 ## Architecture
 
 **Three-class design:**
 
-- **`Main.java`** - CLI entry point, validates args, parses optional parameters
+- **`Main.java`** - CLI entry point using picocli for getopt-style option parsing
 - **`SlideshowCreator2.java`** - Finds images, calculates frame counts, orchestrates encoding
 - **`JCodecParallelEncoder.java`** - Batched parallel H.264 encoding with async MP4 muxing
   - `buildSegmentSpecs()` - Generates segment layout (fade-in, holds, dissolves, fade-out)
@@ -38,12 +43,13 @@ public static final double DEFAULT_TRANSITION = 0.75;    // transition duration
 public static final int DEFAULT_FRAME_RATE = 30;         // frames per second
 ```
 
-These can be overridden via optional command line arguments: `[duration] [transition] [frameRate]`
+These can be overridden via command line options: `-d`, `-t`, `-f`
 
 ## Dependencies
 
 - **JCodec 0.2.5** - Pure Java H.264/MP4 video encoding
 - **JCodec JavaSE 0.2.5** - AWT integration for BufferedImage conversion
+- **picocli 4.7.6** - CLI argument parsing with getopt-style options
 
 ## Requirements
 
@@ -59,7 +65,11 @@ These can be overridden via optional command line arguments: `[duration] [transi
 ## Fast Test
 
 ```bash
-java -jar target/jslideshow-1.3.4-jar-with-dependencies.jar images 5.0 0 30
+# Via Maven profile (builds + runs)
+mvn package exec:java -Pfasttest
+
+# Or directly via JAR
+java -jar target/jslideshow-1.3.4-jar-with-dependencies.jar -d 5.0 -t 0 -f 30 images
 ```
 
 ## Bump Version
