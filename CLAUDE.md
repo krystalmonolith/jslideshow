@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 JSlideshow is a pure Java command-line application that creates MP4 video slideshows from JPG images with smooth dissolve transitions. It uses JCodec (pure Java video encoding library) with no native dependencies.
 
+## Git Branches
+
+The default branch is `master`. There is no `main` branch.
+
 ## Build Commands
 
 ```bash
