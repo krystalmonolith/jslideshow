@@ -130,6 +130,58 @@ java -jar target/jslideshow-1.3.4-jar-with-dependencies.jar -o vacation.mp4 /pat
 java -jar target/jslideshow-1.3.4-jar-with-dependencies.jar -b 4 /path/to/images
 ```
 
+## Docker
+
+Run jslideshow in a Docker container without building from source. The container downloads the fat JAR from the latest GitHub release and runs it with Java 25 (eclipse-temurin JRE).
+
+### Build the Docker Image
+
+```bash
+docker build -t jslideshow .
+```
+
+### Run with Docker
+
+The container uses volume mounts to access images and write output. Mount your image directory and (optionally) a separate output directory.
+
+**Linux:**
+
+```bash
+# Basic — images in ./my-photos, output written alongside the images
+docker run --rm -v ./my-photos:/data jslideshow /data
+
+# Separate input and output directories
+docker run --rm -v ./my-photos:/images -v ./output:/output jslideshow -o /output/slideshow.mp4 /images
+
+# With options
+docker run --rm -v ./my-photos:/images -v ./output:/output jslideshow -d 5 -t 1.0 -f 24 -o /output/slideshow.mp4 /images
+
+# Show help
+docker run --rm jslideshow --help
+```
+
+**Windows (PowerShell):**
+
+```powershell
+# Basic — images in .\my-photos, output written alongside the images
+docker run --rm -v ${PWD}\my-photos:/data jslideshow /data
+
+# Separate input and output directories
+docker run --rm -v ${PWD}\my-photos:/images -v C:\Users\me\Desktop:/output jslideshow -o /output/slideshow.mp4 /images
+
+# With options
+docker run --rm -v ${PWD}\my-photos:/images -v C:\Users\me\Desktop:/output jslideshow -d 5 -t 1.0 -f 24 -o /output/slideshow.mp4 /images
+```
+
+**Windows (Git Bash / MSYS2):**
+
+Git Bash converts Unix-style paths automatically, which breaks container paths. Set `MSYS_NO_PATHCONV=1` to prevent this:
+
+```bash
+# Separate input and output directories
+MSYS_NO_PATHCONV=1 docker run --rm -v C:\Users\me\photos:/images -v C:\Users\me\Desktop:/output jslideshow -o /output/slideshow.mp4 /images
+```
+
 ## How Parallel Encoding Works
 
 JSlideshow uses a **batched segment-based parallel encoding** strategy with an async muxer thread:

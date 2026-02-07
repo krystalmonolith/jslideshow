@@ -66,6 +66,26 @@ These can be overridden via command line options: `-d`, `-t`, `-f`
 - Codec: H.264
 - Default filename pattern: `YYYYMMDD'T'HHmmss-output.mp4` (override with `-o`)
 
+## Docker
+
+Build and run without compiling from source. The Dockerfile downloads the fat JAR from the latest GitHub release.
+
+```bash
+# Build the image
+docker build -t jslideshow .
+
+# Linux — separate input and output mounts
+docker run --rm -v ./my-photos:/images -v ./output:/output jslideshow -o /output/slideshow.mp4 /images
+
+# Windows (PowerShell) — separate input and output mounts
+docker run --rm -v ${PWD}\my-photos:/images -v C:\Users\me\Desktop:/output jslideshow -o /output/slideshow.mp4 /images
+
+# Windows (Git Bash) — must disable MSYS path conversion
+MSYS_NO_PATHCONV=1 docker run --rm -v C:\Users\me\photos:/images -v C:\Users\me\Desktop:/output jslideshow -o /output/slideshow.mp4 /images
+```
+
+Base image: `eclipse-temurin:25-jre`. Workdir: `/data`. All jslideshow CLI options are passed directly after the image name.
+
 ## Test Profiles
 
 ```bash
