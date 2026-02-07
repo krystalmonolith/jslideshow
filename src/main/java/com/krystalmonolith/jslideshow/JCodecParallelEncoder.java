@@ -14,8 +14,11 @@ import org.jcodec.containers.mp4.muxer.MP4Muxer;
 import org.jcodec.scale.AWTUtil;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.util.Iterator;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -44,6 +47,61 @@ public class JCodecParallelEncoder {
 
     private static void clearSpinner() {
         System.out.print("\b \b");
+    }
+
+    /**
+     * Scan image file headers (without full pixel decode) to find max width and max height.
+     */
+    static int[] scanOutputDimensions(File[] imageFiles) throws IOException {
+        int maxWidth = 0;
+        int maxHeight = 0;
+
+        for (File file : imageFiles) {
+            try (ImageInputStream iis = ImageIO.createImageInputStream(file)) {
+                if (iis == null) {
+                    throw new IOException("Cannot read image header: " + file.getName());
+                }
+                Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
+                if (!readers.hasNext()) {
+                    throw new IOException("No image reader found for: " + file.getName());
+                }
+                ImageReader reader = readers.next();
+                try {
+                    reader.setInput(iis);
+                    int w = reader.getWidth(0);
+                    int h = reader.getHeight(0);
+                    maxWidth = Math.max(maxWidth, w);
+                    maxHeight = Math.max(maxHeight, h);
+                } finally {
+                    reader.dispose();
+                }
+            }
+        }
+
+        return new int[]{maxWidth, maxHeight};
+    }
+
+    /**
+     * Center an image on a black background at the given output dimensions.
+     * Returns the original image if it already matches the output size.
+     */
+    static BufferedImage centerOnBlack(BufferedImage img, int outputWidth, int outputHeight) {
+        if (img.getWidth() == outputWidth && img.getHeight() == outputHeight) {
+            return img;
+        }
+
+        BufferedImage canvas = new BufferedImage(outputWidth, outputHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = canvas.createGraphics();
+        try {
+            g.setColor(Color.BLACK);
+            g.fillRect(0, 0, outputWidth, outputHeight);
+            int x = (outputWidth - img.getWidth()) / 2;
+            int y = (outputHeight - img.getHeight()) / 2;
+            g.drawImage(img, x, y, null);
+        } finally {
+            g.dispose();
+        }
+        return canvas;
     }
 
     enum SegmentType { FADE_IN, HOLD, DISSOLVE, FADE_OUT }
@@ -202,7 +260,8 @@ public class JCodecParallelEncoder {
      * Load images needed for a batch into the cache (skipping already-loaded ones).
      */
     private static void loadForBatch(List<SegmentSpec> batch, File[] imageFiles,
-                                     Map<Integer, BufferedImage> imageCache) throws IOException {
+                                     Map<Integer, BufferedImage> imageCache,
+                                     int outputWidth, int outputHeight) throws IOException {
         Set<Integer> needed = new HashSet<>();
         for (SegmentSpec spec : batch) {
             if (spec.imageIndexA() >= 0) needed.add(spec.imageIndexA());
@@ -215,6 +274,7 @@ public class JCodecParallelEncoder {
                 if (img == null) {
                     throw new IOException("Could not read image: " + imageFiles[idx].getName());
                 }
+                img = centerOnBlack(img, outputWidth, outputHeight);
                 imageCache.put(idx, img);
                 clearSpinner();
                 System.out.printf("%n  Loaded: %s (%dx%d)  ", imageFiles[idx].getName(), img.getWidth(), img.getHeight());
@@ -250,10 +310,16 @@ public class JCodecParallelEncoder {
             throw new IllegalArgumentException("Image file list cannot be empty");
         }
 
+        // Scan all image headers to determine output resolution
+        int[] dims = scanOutputDimensions(imageFiles);
+        int outputWidth = dims[0];
+        int outputHeight = dims[1];
+
         List<SegmentSpec> allSpecs = buildSegmentSpecs(imageFiles.length, holdFrames, transitionFrames);
         int totalSegments = allSpecs.size();
 
         long totalFrames = allSpecs.stream().mapToLong(SegmentSpec::frameCount).sum();
+        System.out.printf("Output resolution: %dx%d%n", outputWidth, outputHeight);
         System.out.printf("Encoding %d images into %d segments (%d total frames) @ %d fps%n",
                 imageFiles.length, totalSegments, totalFrames, frameRate);
         System.out.printf("Batch size: %d (parallel threads)%n", batchSize);
@@ -267,7 +333,8 @@ public class JCodecParallelEncoder {
         // Start muxer thread
         Thread muxerThread = new Thread(() -> {
             try {
-                muxerLoop(completedSegments, totalSegments, frameRate, output, muxerLock, encodingComplete);
+                muxerLoop(completedSegments, totalSegments, frameRate, output, muxerLock, encodingComplete,
+                        outputWidth, outputHeight);
             } catch (Exception e) {
                 muxerError.set(e);
             }
@@ -287,7 +354,7 @@ public class JCodecParallelEncoder {
                 List<SegmentSpec> batch = allSpecs.subList(batchStart, batchEnd);
 
                 // Load images needed for this batch
-                loadForBatch(batch, imageFiles, imageCache);
+                loadForBatch(batch, imageFiles, imageCache, outputWidth, outputHeight);
 
                 // Encode batch in parallel
                 batch.parallelStream().forEach(spec -> {
@@ -329,11 +396,12 @@ public class JCodecParallelEncoder {
      */
     private void muxerLoop(ConcurrentSkipListMap<Integer, EncodedSegment> completedSegments,
                            int totalSegments, int frameRate, File output,
-                           Object muxerLock, boolean[] encodingComplete) throws Exception {
+                           Object muxerLock, boolean[] encodingComplete,
+                           int outputWidth, int outputHeight) throws Exception {
         try (SeekableByteChannel out = NIOUtils.writableFileChannel(output.getPath())) {
             MP4Muxer muxer = MP4Muxer.createMP4Muxer(out, Brand.MP4);
 
-            Size size = new Size(1920, 1080);
+            Size size = new Size(outputWidth, outputHeight);
             CodecMP4MuxerTrack track = (CodecMP4MuxerTrack) muxer.addVideoTrack(
                     Codec.H264,
                     VideoCodecMeta.createVideoCodecMeta("avc1", null, size, Rational.ONE)

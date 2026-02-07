@@ -48,6 +48,7 @@ images/*.JPG
 images/*.jpg
 /images/images1080
 /images/images-original
+/images/resolutions
 
 # Output files
 *.mp4
